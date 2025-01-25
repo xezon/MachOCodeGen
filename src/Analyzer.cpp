@@ -1,6 +1,6 @@
-#include "Analyzer.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include <Analyzer.h>
 #include <iostream>
 
 Analyzer::Analyzer(llvm::Module *M) : module(M) {}

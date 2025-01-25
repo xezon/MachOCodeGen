@@ -36,11 +36,12 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 # LLVM settings
-include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-# Include our own headers
-include_directories(${CMAKE_SOURCE_DIR}/include)
+# Include our own headers - make this relative to build directory
+include_directories("${CMAKE_SOURCE_DIR}/include")  # Quote the path
 
 # Create the executable
 add_executable(analyzer

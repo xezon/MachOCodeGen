@@ -1,8 +1,14 @@
-#include "Analyzer.h"
+// LLVM includes
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
+
+// Local includes
+#include "Analyzer.h"
+
+// Standard includes
 #include <iostream>
 #include <memory>
 
