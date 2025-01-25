@@ -44,3 +44,13 @@ cmake-build-*/
 *.exe
 *.out
 *.app
+
+# Windows specific
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
