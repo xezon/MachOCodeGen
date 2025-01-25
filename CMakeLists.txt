@@ -99,6 +99,7 @@ target_sources(MachOCodeGen PRIVATE
     src/main.cpp
     src/utility.cpp
     src/utility.h
+    src/apple/apple_gnu_defs.h
     src/llvm/demangle.cpp
     src/llvm/demangle.h
 )
