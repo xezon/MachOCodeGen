@@ -1,3 +1,17 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# Third party dependencies
+3rdparty/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
 # Prerequisites
 *.d
 
@@ -30,3 +44,13 @@
 *.exe
 *.out
 *.app
+
+# Windows specific
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
