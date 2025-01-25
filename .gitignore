@@ -1,3 +1,17 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# Third party dependencies
+3rdparty/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
 # Prerequisites
 *.d
 
