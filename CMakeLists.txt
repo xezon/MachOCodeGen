@@ -100,8 +100,14 @@ target_sources(MachOCodeGen PRIVATE
     src/utility.cpp
     src/utility.h
     src/apple/apple_gnu_defs.h
+    src/llvm/__cxxabi_config.h
+    src/llvm/abort_message.cpp
+    src/llvm/abort_message.h
+    src/llvm/cxxabi.h
     src/llvm/demangle.cpp
     src/llvm/demangle.h
+    src/llvm/private_typeinfo.cpp
+    src/llvm/private_typeinfo.h
 )
 
 # Common libraries for all platforms
@@ -120,5 +126,6 @@ target_include_directories(MachOCodeGen PRIVATE
 )
 
 target_compile_definitions(MachOCodeGen PRIVATE
+    _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
     $<$<CONFIG:MinSizeRel,Release,RelWithDebInfo>:RELEASE=1> # Can we do this nicer?
 )
