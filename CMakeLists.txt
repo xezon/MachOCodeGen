@@ -20,8 +20,6 @@ if(WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows")
     set(WINDOWS TRUE)
 endif()
 
-project(MachOCodeGen LANGUAGES C CXX)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_CXX_STANDARD 17)
 
@@ -88,7 +86,10 @@ set(GIT_PRE_CONFIGURE_FILE "gitinfo.cpp.in")
 set(GIT_POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/gitinfo.cpp")
 
 include(GitWatcher)
+include(cmake/xllvmdemangler.cmake)
 
+
+project(MachOCodeGen LANGUAGES C CXX)
 add_executable(MachOCodeGen)
 
 # Common sources for all platforms
@@ -96,6 +97,10 @@ target_sources(MachOCodeGen PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/gitinfo.cpp
     gitinfo.h
     src/main.cpp
+    src/utility.cpp
+    src/utility.h
+    src/llvm/demangle.cpp
+    src/llvm/demangle.h
 )
 
 # Common libraries for all platforms
@@ -104,6 +109,7 @@ target_link_libraries(MachOCodeGen PRIVATE
     nlohmann_json
     fmt::fmt
     cxxopts::cxxopts
+    XLLVMDemangler
 )
 
 target_include_directories(MachOCodeGen PRIVATE
