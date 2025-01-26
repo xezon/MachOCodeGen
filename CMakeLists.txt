@@ -96,6 +96,8 @@ add_executable(MachOCodeGen)
 target_sources(MachOCodeGen PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/gitinfo.cpp
     gitinfo.h
+    src/CppTypes.cpp
+    src/CppTypes.h
     src/main.cpp
     src/utility.cpp
     src/utility.h
