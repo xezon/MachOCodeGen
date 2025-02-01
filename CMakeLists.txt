@@ -98,10 +98,11 @@ target_sources(MachOCodeGen PRIVATE
     gitinfo.h
     src/CppTypes.cpp
     src/CppTypes.h
+    src/MachOReader.cpp
+    src/MachOReader.h
     src/main.cpp
     src/utility.cpp
     src/utility.h
-    src/apple/apple_gnu_defs.h
     src/llvm/__cxxabi_config.h
     src/llvm/abort_message.cpp
     src/llvm/abort_message.h
@@ -124,6 +125,7 @@ target_link_libraries(MachOCodeGen PRIVATE
 target_include_directories(MachOCodeGen PRIVATE
     .
     src
+    apple/MacOSX10.4u.sdk/usr/include
     3rdparty/span/include
 )
 
