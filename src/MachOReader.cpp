@@ -9,17 +9,25 @@
 #include <mach-o/nlist.h>
 #include <mach-o/stab.h>
 
+MachOReader::MachOReader()
+{
+}
+
+MachOReader::~MachOReader()
+{
+}
+
 bool MachOReader::Load(const std::string &filepath, LIEF::MachO::Header::CPU_TYPE cpuType)
 {
     std::unique_ptr<LIEF::MachO::FatBinary> fatBinary = LIEF::MachO::Parser::parse(filepath);
     if (fatBinary == nullptr)
         return false;
 
-    std::unique_ptr<LIEF::MachO::Binary> binary = fatBinary->take(cpuType);
-    if (binary == nullptr)
+    m_binary = fatBinary->take(cpuType);
+    if (m_binary == nullptr)
         return false;
 
-    if (!Parse(*binary))
+    if (!Parse(*m_binary))
         return false;
 
     return true;
@@ -149,13 +157,9 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
             functionIndex = m_functions.size() - 1;
             Function &function = m_functions.back();
             function.m_name = std::move(demangled);
-            function.m_sourceLine = symbol.description();
-            function.m_isLocalFunction = isLocal;
-            function.m_isGlobalFunction = isGlobal;
             function.m_headerFileIndex = InvalidIndex; // ???
             function.m_sourceFileIndex = m_sourceFiles.size() - 1;
             function.m_symbols.push_back(&symbol);
-            function.m_mangledNames.push_back(std::move(mangled));
 
             if (isMangled)
             {
@@ -206,10 +210,11 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
                 bufferSize = std::max(bufferSize, size);
             }
 
-            m_sourceFiles.back().m_functionIndices.push_back(functionIndex);
+            assert(function.IsLocalFunction(0) || function.IsGlobalFunction(0));
 
+            m_sourceFiles.back().m_functionIndices.push_back(functionIndex);
             m_nameToFunctionIndex.emplace(function.m_name, functionIndex);
-            m_mangledToFunctionIndex.emplace(function.m_mangledNames.back(), functionIndex);
+            m_mangledToFunctionIndex.emplace(mangled, functionIndex);
         }
         else
         {
@@ -217,14 +222,10 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
 
             Function &function = m_functions[functionIndex];
             function.m_symbols.push_back(&symbol);
-            function.m_mangledNames.push_back(std::move(mangled));
 
-            assert(function.m_sourceLine = symbol.description());
             assert(function.m_sourceFileIndex == m_sourceFiles.size() - 1);
-            assert(function.m_isLocalFunction == isLocal);
-            assert(function.m_isGlobalFunction == isGlobal);
 
-            m_mangledToFunctionIndex.emplace(function.m_mangledNames.back(), functionIndex);
+            m_mangledToFunctionIndex.emplace(mangled, functionIndex);
         }
     }
     else

@@ -64,6 +64,12 @@ struct Class // Alias Struct
 
 struct Function
 {
+    std::string_view GetMangledName(size_t symbolIndex) const;
+    uint32_t GetVirtualAddress(size_t symbolIndex) const;
+    uint32_t GetSourceLine(size_t symbolIndex) const;
+    bool IsLocalFunction(size_t symbolIndex) const; // :f  Local function (non-global function)
+    bool IsGlobalFunction(size_t symbolIndex) const; // :F  Global function (exported function)
+
     std::string m_name;
 
     std::string_view m_functionBaseName; // The base name. Does not include trailing template arguments.
@@ -71,10 +77,6 @@ struct Function
     std::string_view m_functionName; // The entire name.
     std::string_view m_functionParameters;
     std::string_view m_functionReturnType;
-
-    uint16_t m_sourceLine; // Source line.
-    bool m_isLocalFunction = false; // :f  Local function (non-global function)
-    bool m_isGlobalFunction = false; // :F  Global function (exported function)
 
     index_t m_headerFileIndex = InvalidIndex;
     index_t m_sourceFileIndex = InvalidIndex;
@@ -86,7 +88,6 @@ struct Function
     std::vector<index_t> m_enumIndices; // Enums inside this function. Most likely empty.
 
     std::vector<const LIEF::MachO::Symbol *> m_symbols; // Raw pointers to MachO symbols.
-    std::vector<std::string> m_mangledNames; // Mangled function names corresponding to the symbols.
     std::vector<uint32_t> m_sizes; // Sizes corresponding to the symbols.
 
     // TODO: Add properties: virtual, pure virtual, override, const, constructor, destructor...

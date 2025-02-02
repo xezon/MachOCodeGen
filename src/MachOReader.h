@@ -6,6 +6,7 @@
 
 #include <LIEF/MachO/Header.hpp>
 
+#include <memory>
 #include <string_view>
 
 namespace LIEF::MachO
@@ -16,6 +17,9 @@ class Binary;
 class MachOReader
 {
 public:
+    MachOReader();
+    ~MachOReader();
+
     bool Load(const std::string &filepath, LIEF::MachO::Header::CPU_TYPE cpuType);
 
 private:
@@ -24,6 +28,8 @@ private:
     void Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, size_t &bufferSize, index_t &functionIndex);
 
 private:
+    std::unique_ptr<LIEF::MachO::Binary> m_binary;
+
     Namespaces m_namespaces;
     Enums m_enums;
     Variables m_variables;
