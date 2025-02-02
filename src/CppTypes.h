@@ -1,14 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-namespace LIEF::MachO
-{
-class Symbol;
-}
 
 using index_t = uint32_t;
 constexpr index_t InvalidIndex = index_t(~0);
@@ -62,13 +58,28 @@ struct Class // Alias Struct
     std::vector<index_t> m_enumIndices; // Enums inside this class.
 };
 
+struct FunctionInstruction
+{
+    uint64_t m_address = 0;
+    index_t headerFileIndex = InvalidIndex;
+    index_t sourceFileIndex = InvalidIndex;
+};
+
+struct FunctionVariant
+{
+    std::string m_mangledName;
+    uint64_t m_virtualAddress = 0;
+    uint32_t m_size = 0;
+    uint16_t m_sourceLine = 0;
+    std::vector<FunctionInstruction> m_instructions;
+};
+
 struct Function
 {
-    std::string_view GetMangledName(size_t symbolIndex) const;
-    uint32_t GetVirtualAddress(size_t symbolIndex) const;
-    uint32_t GetSourceLine(size_t symbolIndex) const;
-    bool IsLocalFunction(size_t symbolIndex) const; // :f  Local function (non-global function)
-    bool IsGlobalFunction(size_t symbolIndex) const; // :F  Global function (exported function)
+    const std::string &GetMangledName(size_t variantIndex) const;
+    uint64_t GetVirtualAddressBegin(size_t variantIndex) const;
+    uint64_t GetVirtualAddressEnd(size_t variantIndex) const;
+    uint16_t GetSourceLine(size_t variantIndex) const;
 
     std::string m_name;
 
@@ -77,6 +88,9 @@ struct Function
     std::string_view m_functionName; // The entire name.
     std::string_view m_functionParameters;
     std::string_view m_functionReturnType;
+
+    bool m_isLocalFunction = false; // :f  Local function (non-global function)
+    bool m_isGlobalFunction = false; // :F  Global function (exported function)
 
     index_t m_headerFileIndex = InvalidIndex;
     index_t m_sourceFileIndex = InvalidIndex;
@@ -87,8 +101,7 @@ struct Function
     std::vector<index_t> m_variableIndices; // Variables inside this function.
     std::vector<index_t> m_enumIndices; // Enums inside this function. Most likely empty.
 
-    std::vector<const LIEF::MachO::Symbol *> m_symbols; // Raw pointers to MachO symbols.
-    std::vector<uint32_t> m_sizes; // Sizes corresponding to the symbols.
+    std::vector<FunctionVariant> m_variants;
 
     // TODO: Add properties: virtual, pure virtual, override, const, constructor, destructor...
 };
@@ -96,16 +109,16 @@ struct Function
 struct HeaderFile // .h
 {
     std::string m_name;
-    std::vector<index_t> m_functionIndices;
-    std::vector<index_t> m_variableIndices;
-    std::vector<index_t> m_enumIndices;
+    // std::vector<index_t> m_functionIndices;
+    // std::vector<index_t> m_variableIndices;
+    // std::vector<index_t> m_enumIndices;
 };
 
 struct SourceFile // .cpp
 {
     std::string m_name;
-    uint32_t m_vaBegin = 0; // Begin address.
-    uint32_t m_vaEnd = 0; // End address.
+    uint64_t m_vaBegin = 0; // Begin address.
+    uint64_t m_vaEnd = 0; // End address.
     std::vector<index_t> m_headerFileIndices;
     std::vector<index_t> m_functionIndices;
     std::vector<index_t> m_variableIndices;
@@ -122,3 +135,5 @@ using SourceFiles = std::vector<SourceFile>;
 
 using StringToIndexMap = std::unordered_map<std::string, index_t>;
 using StringToIndexMultiMap = std::unordered_multimap<std::string, index_t>;
+
+std::set<std::string> CreateHeaderFileSet(const HeaderFiles &headerFiles, const Function &function);

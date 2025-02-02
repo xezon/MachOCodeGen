@@ -45,20 +45,49 @@ bool MachOReader::Parse(const LIEF::MachO::Binary &binary)
     constexpr size_t BufferSize = 1024;
     char *buffer = (char *)std::malloc(BufferSize);
     size_t bufferSize = BufferSize;
-    index_t functionIndex = 0;
-    bool inSOBlock = false;
+    index_t functionIndex = InvalidIndex;
+    bool SO_InBlock = false;
+    std::string SO_Prefix;
 
-    for (const LIEF::MachO::Symbol &symbol : binary.symbols())
+    LIEF::MachO::Binary::it_const_symbols symbols = binary.symbols();
+    auto SOL_begin = symbols.end();
+    auto SOL_end = symbols.end();
+
+    for (auto it = symbols.begin(); it != symbols.end(); ++it)
     {
+        const LIEF::MachO::Symbol &symbol = *it;
+
         switch (symbol.raw_type())
         {
-            case N_SO: /* source file name: name,,n_sect,0,address */ {
-                Parse_SO(symbol, inSOBlock);
-                break;
-            }
             case N_FUN: /* procedure: name,,n_sect,linenumber,address */ {
                 Parse_FUN(symbol, buffer, bufferSize, functionIndex);
+                // Parse SOL range after function has been parsed.
+                if (symbol.name().empty())
+                {
+                    if (functionIndex != InvalidIndex)
+                    {
+                        for (auto SOL_it = SOL_begin; SOL_it != SOL_end; ++SOL_it)
+                        {
+                            const LIEF::MachO::Symbol &SOL_symbol = *SOL_it;
+                            if (SOL_symbol.raw_type() == N_SOL)
+                            {
+                                Parse_SOL(SOL_symbol, SO_Prefix, functionIndex);
+                            }
+                        }
+                    }
+                    SOL_begin = symbols.end();
+                    SOL_end = symbols.end();
+                }
                 break;
+            }
+            case N_SO: /* source file name: name,,n_sect,0,address */ {
+                Parse_SO(symbol, SO_InBlock, SO_Prefix);
+                break;
+            }
+            case N_SOL: /* #included file name: name,,n_sect,0,address */ {
+                if (SOL_begin == symbols.end())
+                    SOL_begin = it;
+                SOL_end = it + 1;
             }
         }
     }
@@ -68,28 +97,29 @@ bool MachOReader::Parse(const LIEF::MachO::Binary &binary)
     return true;
 }
 
-void MachOReader::Parse_SO(const LIEF::MachO::Symbol &symbol, bool &inSOBlock)
+void MachOReader::Parse_SO(const LIEF::MachO::Symbol &symbol, bool &SO_InBlock, std::string &SO_Prefix)
 {
     if (!symbol.name().empty())
     {
-        if (!inSOBlock)
+        if (!SO_InBlock)
         {
             // Step 1/3
-            inSOBlock = true;
+            SO_InBlock = true;
+            SO_Prefix = symbol.name();
+
             m_sourceFiles.emplace_back();
             SourceFile &sourceFile = m_sourceFiles.back();
-            sourceFile.m_name = symbol.name();
             sourceFile.m_vaBegin = symbol.value();
         }
         else
         {
             // Step 2/3
             SourceFile &sourceFile = m_sourceFiles.back();
-            // symbol.name() is expected to contain the previous symbol name.
-            assert(strstr(symbol.name().c_str(), sourceFile.m_name.c_str()) == symbol.name().c_str());
+
+            assert(strstr(symbol.name().c_str(), SO_Prefix.c_str()) == symbol.name().c_str());
             assert(sourceFile.m_vaBegin == symbol.value());
 
-            sourceFile.m_name = symbol.name().substr(sourceFile.m_name.size());
+            sourceFile.m_name = symbol.name().substr(SO_Prefix.size());
 
             index_t index = m_sourceFiles.size() - 1;
             [[maybe_unused]] auto result = m_nameToSourceFileIndex.try_emplace(sourceFile.m_name, index);
@@ -100,11 +130,56 @@ void MachOReader::Parse_SO(const LIEF::MachO::Symbol &symbol, bool &inSOBlock)
     {
         // Step 3/3
         SourceFile &sourceFile = m_sourceFiles.back();
-        assert(inSOBlock);
+        assert(SO_InBlock);
         assert(sourceFile.m_vaBegin != 0);
 
         sourceFile.m_vaEnd = symbol.value();
-        inSOBlock = false;
+        SO_InBlock = false;
+        SO_Prefix.clear();
+    }
+}
+
+void MachOReader::Parse_SOL(const LIEF::MachO::Symbol &symbol, const std::string &SO_Prefix, index_t functionIndex)
+{
+    Function &function = m_functions[functionIndex];
+    const uint64_t address = symbol.value();
+    const std::string &name = symbol.name();
+
+    const size_t variantIndex = function.m_variants.size() - 1;
+    assert(address >= function.GetVirtualAddressBegin(variantIndex));
+    assert(address < function.GetVirtualAddressEnd(variantIndex));
+
+    std::string sanitizedName;
+    if (starts_with(name, SO_Prefix))
+    {
+        sanitizedName = {name.data() + SO_Prefix.size(), name.size() - SO_Prefix.size()};
+    }
+    else
+    {
+        sanitizedName = name;
+    }
+
+    if (sanitizedName == m_sourceFiles.back().m_name)
+    {
+        // The .cpp file (N_SO)
+        FunctionInstruction instruction;
+        instruction.m_address = address;
+        instruction.sourceFileIndex = m_sourceFiles.size() - 1;
+        function.m_variants.back().m_instructions.push_back(instruction);
+    }
+    else
+    {
+        // A header file
+        index_t headerFileIndex = FindOrCreateHeaderFileIndex(sanitizedName);
+
+        assert(!ends_with(sanitizedName, ".cp"));
+        assert(!ends_with(sanitizedName, ".cpp"));
+        assert(headerFileIndex != InvalidIndex);
+
+        FunctionInstruction instruction;
+        instruction.m_address = address;
+        instruction.headerFileIndex = headerFileIndex;
+        function.m_variants.back().m_instructions.push_back(instruction);
     }
 }
 
@@ -115,9 +190,15 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
         // Step 1/2
         // Skip compiler generated symbols.
         if (starts_with(symbol.name(), "_GLOBAL__"))
+        {
+            functionIndex = InvalidIndex;
             return;
+        }
         if (starts_with(symbol.name(), "_Z41")) // _Z41__static_initialization_and_destruction_0ii:f
+        {
+            functionIndex = InvalidIndex;
             return;
+        }
 
         bool isLocal = ends_with(symbol.name(), ":f");
         bool isGlobal = ends_with(symbol.name(), ":F");
@@ -157,9 +238,17 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
             functionIndex = m_functions.size() - 1;
             Function &function = m_functions.back();
             function.m_name = std::move(demangled);
+            function.m_isLocalFunction = isLocal;
+            function.m_isGlobalFunction = isGlobal;
             function.m_headerFileIndex = InvalidIndex; // ???
             function.m_sourceFileIndex = m_sourceFiles.size() - 1;
-            function.m_symbols.push_back(&symbol);
+            {
+                FunctionVariant variant;
+                variant.m_mangledName = std::move(mangled);
+                variant.m_virtualAddress = symbol.value();
+                variant.m_sourceLine = symbol.description();
+                function.m_variants.push_back(std::move(variant));
+            }
 
             if (isMangled)
             {
@@ -210,28 +299,53 @@ void MachOReader::Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, siz
                 bufferSize = std::max(bufferSize, size);
             }
 
-            assert(function.IsLocalFunction(0) || function.IsGlobalFunction(0));
-
             m_sourceFiles.back().m_functionIndices.push_back(functionIndex);
             m_nameToFunctionIndex.emplace(function.m_name, functionIndex);
-            m_mangledToFunctionIndex.emplace(mangled, functionIndex);
+            m_mangledToFunctionIndex.emplace(function.m_variants.back().m_mangledName, functionIndex);
         }
         else
         {
             // Append to existing record.
 
             Function &function = m_functions[functionIndex];
-            function.m_symbols.push_back(&symbol);
 
+            {
+                FunctionVariant variant;
+                variant.m_mangledName = std::move(mangled);
+                variant.m_virtualAddress = symbol.value();
+                variant.m_sourceLine = symbol.description();
+                function.m_variants.push_back(std::move(variant));
+            }
+
+            assert(function.m_isLocalFunction == isLocal);
+            assert(function.m_isGlobalFunction == isGlobal);
             assert(function.m_sourceFileIndex == m_sourceFiles.size() - 1);
 
-            m_mangledToFunctionIndex.emplace(mangled, functionIndex);
+            m_mangledToFunctionIndex.emplace(function.m_variants.back().m_mangledName, functionIndex);
         }
     }
     else
     {
         // Step 2/2
-        Function &function = m_functions[functionIndex];
-        function.m_sizes.push_back(symbol.value());
+        if (functionIndex != InvalidIndex)
+        {
+            Function &function = m_functions[functionIndex];
+            function.m_variants.back().m_size = symbol.value();
+        }
     }
+}
+
+index_t MachOReader::FindOrCreateHeaderFileIndex(const std::string &name)
+{
+    StringToIndexMap::iterator it = m_nameToHeaderFileIndex.find(name);
+    if (it != m_nameToHeaderFileIndex.end())
+        return it->second;
+
+    HeaderFile headerFile;
+    headerFile.m_name = name;
+    m_headerFiles.push_back(std::move(headerFile));
+    const index_t index = m_headerFiles.size() - 1;
+    [[maybe_unused]] auto result = m_nameToHeaderFileIndex.try_emplace(name, index);
+    assert(result.second);
+    return index;
 }

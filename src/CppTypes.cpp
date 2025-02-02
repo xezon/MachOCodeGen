@@ -2,37 +2,45 @@
 
 #include "utility.h"
 
-#include <LIEF/MachO/Symbol.hpp>
-
 #include <cassert>
 
-std::string_view Function::GetMangledName(size_t symbolIndex) const
+const std::string &Function::GetMangledName(size_t variantIndex) const
 {
-    assert(symbolIndex < m_symbols.size());
-    const LIEF::MachO::Symbol *symbol = m_symbols[symbolIndex];
-    return {symbol->name().data(), symbol->name().size() - 2};
+    assert(variantIndex < m_variants.size());
+    return m_variants[variantIndex].m_mangledName;
 }
 
-uint32_t Function::GetVirtualAddress(size_t symbolIndex) const
+uint64_t Function::GetVirtualAddressBegin(size_t variantIndex) const
 {
-    assert(symbolIndex < m_symbols.size());
-    return m_symbols[symbolIndex]->value();
+    assert(variantIndex < m_variants.size());
+    return m_variants[variantIndex].m_virtualAddress;
 }
 
-uint32_t Function::GetSourceLine(size_t symbolIndex) const
+uint64_t Function::GetVirtualAddressEnd(size_t variantIndex) const
 {
-    assert(symbolIndex < m_symbols.size());
-    return m_symbols[symbolIndex]->description();
+    assert(variantIndex < m_variants.size());
+    return m_variants[variantIndex].m_virtualAddress + m_variants[variantIndex].m_size;
 }
 
-bool Function::IsLocalFunction(size_t symbolIndex) const
+uint16_t Function::GetSourceLine(size_t variantIndex) const
 {
-    assert(symbolIndex < m_symbols.size());
-    return ends_with(m_symbols[symbolIndex]->name(), ":f");
+    assert(variantIndex < m_variants.size());
+    return m_variants[variantIndex].m_sourceLine;
 }
 
-bool Function::IsGlobalFunction(size_t symbolIndex) const
+std::set<std::string> CreateHeaderFileSet(const HeaderFiles &headerFiles, const Function &function)
 {
-    assert(symbolIndex < m_symbols.size());
-    return ends_with(m_symbols[symbolIndex]->name(), ":F");
+    std::set<std::string> set;
+
+    for (const FunctionVariant &variant : function.m_variants)
+    {
+        for (const FunctionInstruction &instruction : variant.m_instructions)
+        {
+            if (instruction.headerFileIndex != InvalidIndex)
+            {
+                set.insert(headerFiles[instruction.headerFileIndex].m_name);
+            }
+        }
+    }
+    return set;
 }

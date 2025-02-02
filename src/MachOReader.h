@@ -12,7 +12,8 @@
 namespace LIEF::MachO
 {
 class Binary;
-}
+class Symbol;
+} // namespace LIEF::MachO
 
 class MachOReader
 {
@@ -24,8 +25,12 @@ public:
 
 private:
     bool Parse(const LIEF::MachO::Binary &binary);
-    void Parse_SO(const LIEF::MachO::Symbol &symbol, bool &inSOBlock);
+    void Parse_SO(const LIEF::MachO::Symbol &symbol, bool &SO_InBlock, std::string &SO_Prefix);
+    void Parse_SOL(const LIEF::MachO::Symbol &symbol, const std::string &SO_Prefix, index_t functionIndex);
     void Parse_FUN(const LIEF::MachO::Symbol &symbol, char *buffer, size_t &bufferSize, index_t &functionIndex);
+
+private:
+    index_t FindOrCreateHeaderFileIndex(const std::string &name);
 
 private:
     std::unique_ptr<LIEF::MachO::Binary> m_binary;
