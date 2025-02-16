@@ -101,16 +101,11 @@ target_sources(MachOCodeGen PRIVATE
     src/MachOReader.cpp
     src/MachOReader.h
     src/main.cpp
+    src/rtti.h
     src/utility.cpp
     src/utility.h
-    src/llvm/__cxxabi_config.h
-    src/llvm/abort_message.cpp
-    src/llvm/abort_message.h
-    src/llvm/cxxabi.h
     src/llvm/demangle.cpp
     src/llvm/demangle.h
-    src/llvm/private_typeinfo.cpp
-    src/llvm/private_typeinfo.h
 )
 
 # Common libraries for all platforms
